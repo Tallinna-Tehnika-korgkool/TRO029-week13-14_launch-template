@@ -1,0 +1,125 @@
+name: Week 13-14 (Launch file) - Check Assignment
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  validate-launch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build course Docker image (from this repo or main course repo)
+        run: |
+          set -euxo pipefail
+          if [ -f docker/Dockerfile ]; then
+            docker build -t tro029-ci -f docker/Dockerfile docker
+          elif [ -f Dockerfile ]; then
+            docker build -t tro029-ci -f Dockerfile .
+          else
+            # Fallback: build from the main course repository
+            git clone --depth 1 https://github.com/Tallinna-Tehnika-korgkool/TRO029---ROS2-sissejuhatus.git /tmp/tro029-course
+            if [ -f /tmp/tro029-course/docker/Dockerfile ]; then
+              docker build -t tro029-ci -f /tmp/tro029-course/docker/Dockerfile /tmp/tro029-course/docker
+            elif [ -f /tmp/tro029-course/Dockerfile ]; then
+              docker build -t tro029-ci -f /tmp/tro029-course/Dockerfile /tmp/tro029-course
+            else
+              echo "ERROR: Could not find Dockerfile in this repo or in the main course repo."
+              exit 1
+            fi
+          fi
+
+      - name: Validate Week 13-14 launch file
+        run: |
+          set -euo pipefail
+          docker run --rm             -v "${{ github.workspace }}:/repo"             --entrypoint /bin/bash             --user root             tro029-ci -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+
+              echo "🚀 Alustan Week 13-14 launch faili kontrolli..."
+              ERRORS=0
+
+              # Source ROS 2
+              if [ -f /opt/ros/humble/setup.bash ]; then
+                source /opt/ros/humble/setup.bash
+              else
+                source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
+              fi
+
+              echo "📂 Otsin turtlesim_mimic_launch.py faili..."
+              LAUNCH_FILE=$(find /repo -maxdepth 4 -type f -name "turtlesim_mimic_launch.py" | head -n 1 || true)
+              if [ -z "$LAUNCH_FILE" ]; then
+                echo "❌ Puudub fail: launch/turtlesim_mimic_launch.py (või mujal repo sees turtlesim_mimic_launch.py)"
+                ERRORS=$((ERRORS+1))
+              else
+                echo "✅ Fail leitud: $LAUNCH_FILE"
+              fi
+
+              if [ "$ERRORS" -eq 0 ]; then
+                echo "🧪 Kontrollin Python süntaksit (py_compile)..."
+                if python3 -m py_compile "$LAUNCH_FILE"; then
+                  echo "✅ Python süntaks korras"
+                else
+                  echo "❌ Python süntaksi viga launch failis"
+                  ERRORS=$((ERRORS+1))
+                fi
+              fi
+
+              if [ "$ERRORS" -eq 0 ]; then
+                echo "🔍 Kontrollin, et launch kirjeldus sisaldab 3 Node action'it ja õigeid seadistusi..."
+                python3 - << "PY" || ERRORS=$((ERRORS+1))
+import importlib.util
+from pathlib import Path
+
+p = Path(r"""$LAUNCH_FILE""")
+spec = importlib.util.spec_from_file_location("turtle_launch", str(p))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+assert hasattr(mod, "generate_launch_description"), "generate_launch_description() puudub"
+ld = mod.generate_launch_description()
+assert isinstance(ld, LaunchDescription), "generate_launch_description ei tagastanud LaunchDescription'i"
+
+entities = list(ld.entities)
+assert len(entities) == 3, f"Ootasin 3 entity't, sain {len(entities)}"
+assert all(isinstance(e, Node) for e in entities), "Kõik entity'd ei ole Node action'id"
+
+rep = "\n".join(repr(e) for e in entities)
+
+# Kontrolli põhilisi osi (paindlikud substring checkid)
+for token in ["turtlesim1", "turtlesim2", "turtlesim_node", "mimic"]:
+    assert token in rep, f"Ei leidnud launch kirjeldusest tokenit: {token}"
+
+# Remap kontroll: pigem failisisu põhjal (stabiilsem kui repr)
+txt = p.read_text(encoding="utf-8")
+for token in ["/input/pose", "/output/cmd_vel", "/turtlesim1/turtle1/pose", "/turtlesim2/turtle1/cmd_vel"]:
+    assert token in txt, f"Ei leidnud launch failist remap tokenit: {token}"
+
+print("OK: LaunchDescription ja sisu kontroll läbitud.")
+PY
+                if [ "$ERRORS" -eq 0 ]; then
+                  echo "✅ LaunchDescription struktuur tundub korrektne"
+                else
+                  echo "❌ LaunchDescription kontroll ebaõnnestus"
+                fi
+              fi
+
+              echo "--------------------------------"
+              if [ $ERRORS -eq 0 ]; then
+                echo "🎉 Kõik korras! Week 13-14 launch ülesanne läbitud."
+                exit 0
+              else
+                echo "❌ Kokku leitud vigu: $ERRORS"
+                exit 1
+              fi
+            '
