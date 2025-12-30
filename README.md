@@ -160,15 +160,31 @@ ros2 topic list
 
 ---
 
-## Esitamine
+## Esitamise kord
 
-> **NB!** Harjutuse edukaks esitamiseks **pead töötama oma isiklikus GitHub Classroomi repos**. Veendu, et teed `git push` käsu õiges projektis.
->
-> Lisa, commiti ja pushi oma uus `my_launch_pkg` pakett.
->
-> ```bash
-> # Näidiskäsud sinu enda repos
-> git add .
-> git commit -m "Week 13-14: Loodud launch-fail py_pubsub jaoks"
-> git push
-> ```
+Harjutuse edukaks esitamiseks **pead töötama oma isiklikus GitHub Classroomi repos**, mis on loodud selle nädala jaoks.
+
+1.  **Ava ülesande link Moodle'ist:**
+    - Mine kursuse Moodle'i lehele.
+    - Leia sealt selle nädala (Week 13-14) ülesande juurest link oma isikliku GitHub Classroomi repositooriumi loomiseks.
+
+2.  **Klooni enda isiklik repo GitHubist**, mille nimi sisaldab sinu GitHubi kasutajanime.
+    Näide:
+    ```bash
+    git clone https://github.com/Tallinna-Tehnika-korgkool/TRO029-week13-14_launch-<sinu_kasutajanimi>
+    ```
+
+3.  **Tee kõik ülesanded selles kloonitud repos.**
+
+4.  **Lisa ja `commit`'i oma muudatused** (`ros2_ws` kaust koos sinu paketiga).
+    ```bash
+    git add .
+    git commit -m "docs: Complete week 13-14 exercise"
+    git push
+    ```
+
+5.  Kui `push` on tehtud, käivituvad **automaatsed testid** (GitHub Actions) sinu repo **Actions** vahekaardil.
+    - ✅ **Roheline** ✔️ tähendab, et kõik on korras.
+    - ❌ **Punane** ✖️ tähendab, et midagi on puudu või valesti – paranda ja tee uus `commit` ja `push`.
+
+> **NB!** Kui töötad väljaspool oma isiklikku Classroom repo't, siis testid ei tööta ja harjutust ei loeta esitatuks.
